@@ -1,0 +1,10 @@
+{
+  "name": "coral-analysis-tool",
+  "version": "1.0.0",
+  "description": "A desktop application for analyzing coral coverage in images",
+  "main": "main.py",
+  "private": true,
+  "scripts": {
+    "start": "python main.py"
+  }
+}
