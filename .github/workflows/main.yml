@@ -39,7 +39,7 @@ jobs:
           --windowed \
           --icon=src/gui/components/logo.png \
           --add-data="src/gui/components/logo.png:src/gui/components" \
-          --add-data="models:models" \
+          --add-data="src/models:src/models" \
           --hidden-import=PIL._tkinter_finder \
           --hidden-import=cv2 \
           --hidden-import=ultralytics \
@@ -47,7 +47,10 @@ jobs:
           --hidden-import=PyQt6 \
           --hidden-import=torch \
           --hidden-import=torchvision \
+          --hidden-import=pydantic \
           --collect-all=ultralytics \
+          --collect-all=torch \
+          --collect-all=torchvision \
           --noconfirm \
           main.py
           
