@@ -25,12 +25,9 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller==5.13.2
         
-    - name: Create hooks directory
+    - name: Include custom hooks
       run: |
-        mkdir -p hooks
-        echo 'from PyInstaller.utils.hooks import collect_all
-        datas, binaries, hiddenimports = collect_all("pydantic")
-        hiddenimports += ["pydantic.json", "pydantic.dataclasses", "pydantic.datetime_parse", "pydantic.types", "pydantic.fields"]' > hooks/hook-pydantic.py
+        cp -R hooks ./
         
     - name: Build with PyInstaller
       run: |
