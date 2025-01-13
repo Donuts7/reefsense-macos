@@ -55,7 +55,7 @@ def calculate_total_coral_cover(image_dir, annotation_dir, class_names, limit=No
     annotation_files = [f for f in os.listdir(annotation_dir) if f.endswith(".txt")]
     if limit:
         annotation_files = annotation_files[:limit]
-        
+    
     for annotation_filename in annotation_files:
         annotation_path = os.path.join(annotation_dir, annotation_filename)
         image_path = os.path.join(image_dir, os.path.splitext(annotation_filename)[0] + ".jpg")
@@ -66,10 +66,11 @@ def calculate_total_coral_cover(image_dir, annotation_dir, class_names, limit=No
         img_size = Image.open(image_path).size
         img_area = img_size[0] * img_size[1]
         total_image_area += img_area
-        
+    
         polygons = read_polygons_from_file(annotation_path, class_names)
+    
         image_class_areas = calculate_areas(polygons, img_size)
-        
+       
         image_coverage = {}
         for class_id, area in image_class_areas.items():
             coverage_percentage = (area["total_area"] / img_area) * 100
@@ -78,7 +79,7 @@ def calculate_total_coral_cover(image_dir, annotation_dir, class_names, limit=No
             class_area_totals[class_id] += area["total_area"]
             
         image_coverages[os.path.splitext(annotation_filename)[0]] = image_coverage
-    
+
     class_coverage = {
         class_names[class_id]: (area / total_image_area) * 100
         for class_id, area in class_area_totals.items()

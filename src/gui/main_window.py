@@ -43,6 +43,7 @@ class MainWindow(QMainWindow):
         self.model_manager = ModelManager()
         self.cropping_model = CroppingModel()
         self.latest_output_dir = None
+        self.class_names = None  # Will store class names from YAML
         self.setup_ui()
         self._connect_signals()
 
@@ -108,26 +109,7 @@ class MainWindow(QMainWindow):
         self.view_results_btn = QPushButton("View Results")
         self.view_results_btn.clicked.connect(self.open_results_folder)
         self.view_results_btn.setEnabled(False)
-        # self.view_results_btn.setStyleSheet("""
-        #     QPushButton {
-        #         background-color: darkgray;  /* Default background color */
-        #         color: white;  /* Default text color */
-        #         border: 1px solid gray;
-        #         border-radius: 5px;
-        #         padding: 5px 10px;
-        #     }
-        #     QPushButton:enabled {
-        #         background-color: blue;  /* Blue when enabled */
-        #         color: white;
-        #     }
-        #     QPushButton:enabled:hover {
-        #         background-color: lightblue;  /* Optional hover effect only when enabled */
-        #     }
-        #     QPushButton:disabled {
-        #         background-color: darkgray;  /* Dark gray when disabled */
-        #         color: lightgray;  /* Dimmed text */
-        #     }
-        # """)
+
         button_container.addWidget(self.view_results_btn)        
         layout.addLayout(button_container)
         
@@ -193,28 +175,28 @@ class MainWindow(QMainWindow):
                 raise ValueError("Labels folder not found. For quantification, there must be a 'labels' subfolder in the selected image directory.")
             
         return True
+    
+
 
     def run_analysis(self):
         try:
             self.setEnabled(False)
-            # Reset results display
             self.results_view.reset_display()
-            
-            # Show processing status
             self.status_label.setText("Processing images...")
             self.status_label.show()
-            
-            # Disable analyze button while processing
             self.centralWidget().findChild(QPushButton, "").setEnabled(False)
-            
-            # Force UI update
             self.repaint()
             
             image_dir = self.folder_selector.get_image_path()
             self.validate_folders(image_dir)
-                
+            
             # Get the limit from analysis options
             limit = self.analysis_options.get_limit()
+            
+            # Create base output directory
+            base_output_dir = os.path.join(os.getcwd(), "outputs")
+            os.makedirs(base_output_dir, exist_ok=True)
+            
             if self.model_selector.get_selected_model() == "crop_only":
                 success_count, failed_count, output_dir = self.cropping_model.process_folder(
                     image_dir,
@@ -230,11 +212,16 @@ class MainWindow(QMainWindow):
                 self.view_results_btn.setEnabled(True)
                 return
                 
-            # First step: Cropping if enabled
+            # Handle cropping if enabled
+            working_dir = image_dir
             if self.analysis_options.is_cropping_enabled():
+                cropping_output_dir = os.path.join(base_output_dir, "cropping")
+                os.makedirs(cropping_output_dir, exist_ok=True)
+                
                 success_count, failed_count, output_dir = self.cropping_model.process_folder(
                     image_dir,
-                    limit=limit
+                    limit=limit,
+                    output_dir=cropping_output_dir  # Specify the output directory explicitly
                 )
                 
                 QMessageBox.information(
@@ -243,12 +230,14 @@ class MainWindow(QMainWindow):
                     f"Successfully cropped {success_count} images\nFailed to crop {failed_count} images"
                 )
                 # Use cropped images for next step
-                image_dir = output_dir
-                
-            # Second step: Run prediction or quantification
+                working_dir = output_dir
+                    
+                    
+
+            # Run prediction or quantification
             try:
-                self._run_analysis_step(image_dir)
-                self.view_results_btn.setEnabled(True)  # Enable the view results button
+                self._run_analysis_step(working_dir)
+                self.view_results_btn.setEnabled(True)
             except Exception as e:
                 raise e
             
@@ -256,41 +245,33 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", str(e))
             
         finally:
-            # Hide processing status and re-enable button
             self.setEnabled(True)
             self.status_label.hide()
             self.centralWidget().findChild(QPushButton, "").setEnabled(True)
-                  
-    # def _run_analysis_step(self, image_dir):
-    #     """Run either prediction or quantification based on options."""
-    #     limit = self.analysis_options.get_limit()
-    #     model_type = self.model_selector.get_selected_model()
-        
-    #     # Load appropriate model
-    #     model, class_names = self.model_manager.load_model(model_type)
-        
-    #     if self.model_selector.get_selected_model() == "quantify":
-    #         labels_dir = os.path.join(image_dir, "labels")
-    #         self._run_quantification(image_dir, labels_dir, class_names, limit)
-    #     else:
-    #         self._run_prediction(model, image_dir, class_names, limit)
+
     def _run_analysis_step(self, image_dir):
         """Run either prediction or quantification based on options."""
         limit = self.analysis_options.get_limit()
         model_type = self.model_selector.get_selected_model()
         compare = self.analysis_options.is_comparison_enabled()
-        confidence = self.analysis_options.get_confidence()  
+        confidence = self.analysis_options.get_confidence()
+        
+        # Create clean output directories
+        base_output_dir = os.path.join(os.getcwd(), "outputs")
+        os.makedirs(base_output_dir, exist_ok=True)
         
         # Load appropriate model
-        model, class_names = self.model_manager.load_model(model_type)
+        model, class_names = self.model_manager.load_model(model_type,image_dir)
         
         if compare:
             self._run_comparison_analysis(image_dir, model_type, limit, class_names, confidence)
-        elif self.model_selector.get_selected_model() == "quantify":
+        elif model_type == "quantify":
             labels_dir = os.path.join(image_dir, "labels")
             self._run_quantification(image_dir, labels_dir, class_names, limit)
         else:
             self._run_prediction(model, image_dir, class_names, limit, confidence)
+
+
 
     def _run_comparison_analysis(self, image_dir, model_type, limit, class_names, confidence):
         """Run analysis with comparison to ground truth."""
@@ -330,13 +311,7 @@ class MainWindow(QMainWindow):
                 limit=limit
             )
             
-            # Process predictions with legends
-            process_predictions_with_legend(
-                pred_labels_dir,
-                pred_images_dir,
-                class_names,
-                pred_image_coverages
-            )
+
             
             # Process ground truth with legends
             add_segmentation_annotations(
@@ -346,6 +321,15 @@ class MainWindow(QMainWindow):
                 quantify_folder=quantify_folder,
                 image_coverages=gt_image_coverages,
                 limit=limit
+            )
+            
+            # Process predictions with legends
+            process_predictions_with_legend(
+                pred_labels_dir,
+                pred_images_dir,
+                class_names,
+                pred_image_coverages,
+                
             )
             
             # Create comparison directory
@@ -446,7 +430,7 @@ class MainWindow(QMainWindow):
                 limit=limit
             )
 
-
+            
             add_segmentation_annotations(
             image_dir=image_dir,
             labels_dir=labels_dir,
@@ -456,6 +440,15 @@ class MainWindow(QMainWindow):
             limit=limit
         )
 
+            
+            # Process predictions with legends
+            # process_predictions_with_legend(
+            #     image_dir,
+            #     labels_dir,
+            #     class_names,
+            #     image_coverages,
+            #     quant_colors = quant_colors
+            # )
             # Store the output directory and update UI
             self.latest_output_dir = quantify_folder
             self.results_view.display_results(class_coverage, total_coverage)
