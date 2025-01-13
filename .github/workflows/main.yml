@@ -25,9 +25,6 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller==5.13.2
         
-    - name: Include custom hooks
-      run: |
-        cp -R hooks ./
         
     - name: Build with PyInstaller
       run: |
