@@ -1,0 +1,80 @@
+name: Build macOS App
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller==5.13.2
+        
+        
+    - name: Build with PyInstaller
+      run: |
+        pyinstaller --name=reefsense \
+          --onedir \
+          --windowed \
+          --icon=src/gui/components/logo.png \
+          --add-data="src/gui/components/logo.png:src/gui/components" \
+          --add-data="src/models:src/models" \
+          --hidden-import=PIL._tkinter_finder \
+          --hidden-import=cv2 \
+          --hidden-import=ultralytics \
+          --hidden-import=numpy \
+          --hidden-import=PyQt6 \
+          --hidden-import=torch \
+          --hidden-import=torchvision \
+          --hidden-import=pydantic \
+          --collect-all=ultralytics \
+          --collect-all=torch \
+          --collect-all=torchvision \
+          --noconfirm \
+          main.py
+          
+    - name: Create README for macOS users
+      run: |
+        echo "# ReefSense for macOS
+
+        ## Opening the Application
+        Since this app isn't signed with an Apple Developer certificate, you'll need to:
+
+        1. Right-click (or Control-click) the ReefSense app
+        2. Select 'Open' from the menu
+        3. Click 'Open' in the security dialog
+        4. The app will now open and can be used normally
+
+        If you see 'App is damaged' message:
+        1. Open Terminal
+        2. Run: xattr -cr /path/to/ReefSense.app
+        3. Try opening the app again
+
+        ## Support
+        If you encounter any issues, please report them on our GitHub repository." > dist/reefsense/README_MACOS.txt
+        
+    - name: Create ZIP archive
+      run: |
+        cd dist
+        zip -r reefsense_macos.zip reefsense
+        
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: reefsense-macos
+        path: dist/reefsense_macos.zip
