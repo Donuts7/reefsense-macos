@@ -48,7 +48,25 @@ jobs:
           --collect-all=torch \
           --collect-all=torchvision \
           --noconfirm \
+          --osx-bundle-identifier="com.reefsense.app" \
           main.py
+
+    - name: Verify and package app
+      run: |
+        # Check if .app was created
+        if [ ! -d "dist/ReefSense.app" ]; then
+          echo "Error: .app bundle was not created"
+          exit 1
+        fi
+        
+        # Create dmg folder
+        mkdir -p dist/dmg
+        mv "dist/ReefSense.app" "dist/dmg/"
+        
+        # Create ZIP archive of the .app
+        cd dist/dmg
+        zip -r ../reefsense_macos.zip ReefSense.app
+        cd ../..
           
     - name: Create README for macOS users
       run: |
