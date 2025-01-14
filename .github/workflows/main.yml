@@ -33,7 +33,6 @@ jobs:
         pyinstaller --name=reefsense-${{ matrix.architecture }} \
           --onedir \
           --windowed \
-          --target-app \
           --icon=src/gui/components/logo.png \
           --add-data="src/gui/components/logo.png:src/gui/components" \
           --add-data="src/models:src/models" \
